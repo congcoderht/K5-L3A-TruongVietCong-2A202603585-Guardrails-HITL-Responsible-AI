@@ -38,7 +38,7 @@ PROVIDER_LIQUID = "liquid"
 BLUE_PROVIDER = PROVIDER_LIQUID
 BLUE_MODEL = "liquid/lfm-3-1.7b:free"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-LIQUID_BASE_URL = "https://api.liquid.ai/v1"
+LIQUID_BASE_URL = "https://api.liquid.ai/openai/v1"
 DEFAULT_OPENROUTER_MODEL = BLUE_MODEL  # alias
 
 # --- Red Team ---
@@ -107,6 +107,11 @@ def get_blue_provider() -> str:
 def get_blue_model() -> str:
     # Hard-locked; env cannot override for the graded Blue Team path.
     return BLUE_MODEL
+
+
+def get_blue_api_model() -> str:
+    """Return the Liquid API catalog ID for the fixed LFM3-1.7B model."""
+    return "lfm3-1.7b"
 
 
 def get_liquid_api_key() -> str:
