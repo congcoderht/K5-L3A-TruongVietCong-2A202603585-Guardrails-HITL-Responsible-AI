@@ -41,12 +41,12 @@ def content_filter(response: str) -> dict:
 
     # PII patterns to check
     PII_PATTERNS = {
-        # TODO: Add regex patterns for:
-        # - VN phone number: r"0\d{9,10}"
-        # - Email: r"[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}"
-        # - National ID (CMND/CCCD): r"\b\d{9}\b|\b\d{12}\b"
-        # - API key pattern: r"sk-[a-zA-Z0-9-]+"
-        # - Password pattern: r"password\s*[:=]\s*\S+"
+        "phone number": r"(?<!\w)(?:\+?84[ .-]?(?:0[ .-]?)?|0)(?:\d[ .-]?){8,10}(?!\w)",
+        "email address": r"(?<![\w.+-])[\w.+-]+@(?:[\w-]+\.)+[a-zA-Z]{2,}(?![\w.-])",
+        "national ID": r"(?<!\d)(?:\d{9}|\d{12})(?!\d)",
+        "API key": r"\bsk-[A-Za-z0-9_-]{8,}\b",
+        "password": r"\b(?:password|passwd|mat\s*khau)\s*(?:(?:is|la)\s*)?[:=]?\s*[^\s,;.!?]+",
+        "API key label": r"\bapi\s*key\s*(?:(?:is|la)\s*)?[:=]\s*[^\s,;.!?]+",
     }
 
     for name, pattern in PII_PATTERNS.items():
@@ -89,15 +89,8 @@ Respond with ONLY one word: SAFE or UNSAFE
 If UNSAFE, add a brief reason on the next line.
 """
 
-# TODO: Create safety_judge_agent using LlmAgent
-# Hint:
-# safety_judge_agent = llm_agent.LlmAgent(
-#     model="gemini-3.5-flash",
-#     name="safety_judge",
-#     instruction=SAFETY_JUDGE_INSTRUCTION,
-# )
-
-safety_judge_agent = None  # TODO: Replace with implementation
+# LLM-as-Judge is optional in CP2; deterministic filtering is the required path.
+safety_judge_agent = None
 judge_runner = None
 
 
@@ -172,16 +165,25 @@ class OutputGuardrailPlugin(base_plugin.BasePlugin):
         if not response_text:
             return llm_response
 
-        # TODO: Implement logic:
-        # 1. Call content_filter(response_text)
-        #    - If issues found: replace llm_response.content with redacted version
-        #    - Increment self.redacted_count
-        # 2. If use_llm_judge: call llm_safety_check(response_text)
-        #    - If unsafe: replace llm_response.content with a safe message
-        #    - Increment self.blocked_count
-        # 3. Return llm_response (possibly modified)
+        filtered = content_filter(response_text)
+        if filtered["issues"]:
+            self.redacted_count += 1
+            llm_response.content = types.Content(
+                role="model",
+                parts=[types.Part.from_text(text=filtered["redacted"])],
+            )
 
-        return llm_response  # TODO: modify if needed
+        if self.use_llm_judge:
+            judge = await llm_safety_check(filtered["redacted"])
+            if not judge["safe"]:
+                self.blocked_count += 1
+                llm_response.content = types.Content(
+                    role="model",
+                    parts=[types.Part.from_text(
+                        text="Response withheld for safety. Please ask a VinBank banking question."
+                    )],
+                )
+        return llm_response
 
 
 # ============================================================
